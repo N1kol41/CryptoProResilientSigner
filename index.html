@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Отказоустойчивое подписание КриптоПро в Internet Explorer</title>
+  <meta name="description" content="Автономное пакетное подписание документов через КриптоПро ЭЦП в Internet Explorer с контролем зависаний и авто-перезапуском." />
+  <style>
+    /* CSS: Совместимо со всеми версиями Internet Explorer (IE9-IE11) и Edge */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0b1120;
+      color: #e2e8f0;
+      line-height: 1.5;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    header {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      background: rgba(14, 165, 233, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(14, 165, 233, 0.3);
+      margin-bottom: 10px;
+    }
+    .badge-success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .badge-warn {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+    .badge-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    h1 {
+      font-size: 24px;
+      color: #ffffff;
+      margin-bottom: 8px;
+    }
+    p.subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      margin: -10px;
+      margin-bottom: 20px;
+    }
+    .col-6 {
+      flex: 0 0 50%;
+      max-width: 50%;
+      padding: 10px;
+    }
+    .col-12 {
+      flex: 0 0 100%;
+      max-width: 100%;
+      padding: 10px;
+    }
+    @media (max-width: 768px) {
+      .col-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+      }
+    }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 20px;
+      height: 100%;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #0284c7;
+      color: #ffffff;
+    }
+    .btn-primary:hover {
+      background: #0369a1;
+    }
+    .btn-secondary {
+      background: #334155;
+      color: #e2e8f0;
+      margin-left: 8px;
+    }
+    .btn-secondary:hover {
+      background: #475569;
+    }
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      margin-right: 6px;
+      margin-bottom: 6px;
+      padding: 7px 13px;
+      font-size: 12px;
+    }
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.35);
+    }
+    .btn-warn {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      margin-right: 6px;
+      margin-bottom: 6px;
+      padding: 7px 13px;
+      font-size: 12px;
+    }
+    .btn-warn:hover {
+      background: rgba(245, 158, 11, 0.35);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .progress-bar-container {
+      background: #0f172a;
+      border-radius: 999px;
+      height: 14px;
+      overflow: hidden;
+      margin: 15px 0 10px;
+      border: 1px solid #334155;
+    }
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #0284c7, #10b981);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s;
+    }
+    .stats-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 15px;
+    }
+    .stat-val {
+      font-weight: 700;
+      color: #f8fafc;
+    }
+    /* Watchdog Monitor Box */
+    .watchdog-panel {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 15px;
+    }
+    .watchdog-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      margin-right: 6px;
+    }
+    .pulse-dot.stalled {
+      background: #ef4444;
+    }
+    .watchdog-progress {
+      background: #1e293b;
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+    }
+    .watchdog-bar {
+      background: #38bdf8;
+      height: 100%;
+      width: 0%;
+      transition: width 0.5s ease-out;
+    }
+    .watchdog-bar.alert {
+      background: #ef4444;
+    }
+    .log-box {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      height: 250px;
+      overflow-y: auto;
+      color: #38bdf8;
+      line-height: 1.6;
+    }
+    .log-entry {
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+    .log-time {
+      color: #64748b;
+    }
+    .log-err {
+      color: #f87171;
+    }
+    .log-warn {
+      color: #fbbf24;
+    }
+    .log-succ {
+      color: #34d399;
+    }
+    .log-sys {
+      color: #c084fc;
+    }
+    .docs-list {
+      max-height: 340px;
+      overflow-y: auto;
+    }
+    .doc-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .doc-item.active {
+      border-color: #0284c7;
+      background: rgba(2, 132, 199, 0.1);
+    }
+    .doc-item.stalled {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.15);
+    }
+    .doc-item.retrying {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.15);
+    }
+    .doc-item.signed {
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .doc-name {
+      font-weight: 600;
+      color: #e2e8f0;
+      max-width: 60%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    pre.code-block {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      color: #38bdf8;
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid #334155;
+      margin-bottom: 15px;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: #94a3b8;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      color: #38bdf8;
+      border-bottom-color: #38bdf8;
+    }
+    .tab-pane {
+      display: none;
+    }
+    .tab-pane.active {
+      display: block;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+    th, td {
+      border: 1px solid #334155;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    th {
+      background: #0f172a;
+      color: #94a3b8;
+    }
+    td {
+      color: #cbd5e1;
+    }
+    .pill {
+      font-family: monospace;
+      font-weight: bold;
+      color: #f87171;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div class="badge">100% Чистый JavaScript • Встроенный Watchdog • Авто-перезапуск</div>
+    <h1>Отказоустойчивое подписание КриптоПро в Internet Explorer</h1>
+    <p class="subtitle">
+      Автоматическая проверка зависаний процесса подписания (модальное окно PIN, deadlock в cpcsp.dll, потеря отклика COM). При зависании сторожевой таймер сбрасывает старый контекст, освобождает память и <strong>автоматически перезапускает подписание с прерванного документа</strong>.
+    </p>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('sim')">Интерактивный симулятор &amp; Watchdog</button>
+    <button class="tab-btn" onclick="switchTab('code')">Исходный код (Watchdog + Clean JS)</button>
+    <button class="tab-btn" onclick="switchTab('errors')">Справочник ошибок COM</button>
+    <button class="tab-btn" onclick="switchTab('guide')">Архитектура проверки зависаний</button>
+  </div>
+
+  <!-- TAB 1: Simulator with Watchdog -->
+  <div id="tab-sim" class="tab-pane active">
+    <div class="grid">
+      <!-- Left: Controls & Document List -->
+      <div class="col-6">
+        <div class="card">
+          <div class="card-title">
+            <span>Управление пакетом</span>
+            <span id="batchStatusBadge" class="badge">Ожидание</span>
+          </div>
+
+          <!-- Watchdog Monitor Box -->
+          <div class="watchdog-panel">
+            <div class="watchdog-header">
+              <span>
+                <span id="pulseDot" class="pulse-dot"></span>
+                <strong>Сторожевой таймер зависаний (Watchdog):</strong>
+              </span>
+              <span id="watchdogStatusText" style="color: #38bdf8;">Мониторинг активен (1 сек)</span>
+            </div>
+            <div class="watchdog-progress">
+              <div id="watchdogBar" class="watchdog-bar"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-top: 6px;">
+              <span>Время текущего документа: <strong id="currentDocTime" style="color: #f8fafc;">0.0 с</strong></span>
+              <span>Лимит таймаута: <strong id="limitTimeLabel" style="color: #fbbf24;">5.0 с</strong></span>
+              <span>Авто-перезапусков: <strong id="restartCountLabel" style="color: #34d399;">0</strong></span>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 12px; display: flex; gap: 10px;">
+            <div style="flex: 1;">
+              <label style="font-size: 11px; color: #94a3b8;">Отпечаток сертификата:</label>
+              <input type="text" id="certInput" value="38FA5B74D1C35502A5092BC18C2C94FA5E6D8A12" style="width: 100%; padding: 6px 8px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-family: monospace; font-size: 11px; margin-top: 3px;" />
+            </div>
+            <div style="width: 130px;">
+              <label style="font-size: 11px; color: #94a3b8;">Лимит зависания:</label>
+              <select id="timeoutSelect" onchange="updateTimeoutLimit(this.value)" style="width: 100%; padding: 6px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 11px; margin-top: 3px;">
+                <option value="5" selected>5 сек (тест)</option>
+                <option value="10">10 сек</option>
+                <option value="30">30 сек (Прод)</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 15px;">
+            <button id="btnStart" class="btn btn-primary" onclick="startOrResumeSigning()">▶ Начать / Возобновить</button>
+            <button id="btnPause" class="btn btn-secondary" onclick="pauseSigning()" disabled>⏸ Пауза</button>
+            <button id="btnReset" class="btn btn-secondary" onclick="resetBatch()">Сброс</button>
+          </div>
+
+          <div class="progress-bar-container">
+            <div id="progressFill" class="progress-bar-fill"></div>
+          </div>
+          <div class="stats-row">
+            <div>Прогресс: <span id="progressText" class="stat-val">0 / 8 документов</span></div>
+            <div>Память IE (32-bit): <span id="memoryText" class="stat-val" style="color: #38bdf8;">195 МБ</span></div>
+          </div>
+
+          <div style="margin-top: 15px; padding-top: 12px; border-top: 1px solid #334155;">
+            <div style="font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 8px;">Проверка сторожевого таймера и сбоев:</div>
+            <button class="btn btn-danger" style="font-weight: bold; background: rgba(239, 68, 68, 0.3);" onclick="simulateHangAndWatchdogRestart()">
+              🛑 Имитировать зависание процесса (Проверить авто-перезапуск)
+            </button>
+            <div style="margin-top: 6px;">
+              <button class="btn btn-warn" onclick="injectCrash('0x800706BA')">⚡ 0x800706BA (RPC сбой)</button>
+              <button class="btn btn-warn" onclick="injectCrash('0x80090016')">🔌 0x80090016 (Токен вынут)</button>
+              <button class="btn btn-secondary" style="font-size: 12px; padding: 7px 13px; margin-bottom: 6px;" onclick="injectCrash('RELOAD')">🔄 Перезапуск F5</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Documents Queue -->
+      <div class="col-6">
+        <div class="card">
+          <div class="card-title">
+            <span>Очередь документов</span>
+            <span style="font-size: 12px; color: #94a3b8;">LocalStorage Checkpoints</span>
+          </div>
+          <div id="docsList" class="docs-list"></div>
+        </div>
+      </div>
+
+      <!-- Console Logs -->
+      <div class="col-12">
+        <div class="card">
+          <div class="card-title">
+            <span>Журнал событий процесса, Watchdog и криптопровайдера</span>
+            <button style="background: none; border: none; color: #94a3b8; font-size: 12px; cursor: pointer;" onclick="clearLogs()">Очистить</button>
+          </div>
+          <div id="logBox" class="log-box"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Clean Vanilla JS Code -->
+  <div id="tab-code" class="tab-pane">
+    <div class="card">
+      <div class="card-title">
+        <span>Полный исходный код с проверкой зависаний на чистом JavaScript (ES5)</span>
+        <button class="btn btn-primary" onclick="copyPureCode()">Скопировать код</button>
+      </div>
+      <p style="font-size: 13px; color: #94a3b8; margin-bottom: 12px;">
+        Включает сторожевой интервальный таймер <code style="color: #38bdf8;">checkProcessHang()</code>, счетчик поколений операции <code style="color: #38bdf8;">operationGeneration</code> (чтобы зависший ответ не сломал очередь) и функцию <code style="color: #38bdf8;">autoRestartSigning()</code>.
+      </p>
+      <pre id="pureJsCodeView" class="code-block"></pre>
+    </div>
+  </div>
+
+  <!-- TAB 3: Errors Matrix -->
+  <div id="tab-errors" class="tab-pane">
+    <div class="card">
+      <div class="card-title">
+        <span>Матрица кодов ошибок COM и зависаний</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Код / Состояние</th>
+            <th>Название</th>
+            <th>Причина в IE / КриптоПро</th>
+            <th>Действие автоматического Watchdog</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="pill" style="color: #f59e0b;">DEADLOCK / HANG</td>
+            <td>PROCESS_HUNG_STALLED</td>
+            <td>Окно ввода PIN (cpui.dll) потеряло фокус, застряло за другими окнами или драйвер завис.</td>
+            <td>Сторожевой таймер фиксирует превышение лимита, аннулирует старый дескриптор, вызывает <code style="color: #38bdf8;">CollectGarbage()</code> и <strong>автоматически перезапускает подписание</strong>.</td>
+          </tr>
+          <tr>
+            <td class="pill">0x800706BA</td>
+            <td>RPC_S_SERVER_UNAVAILABLE</td>
+            <td>Падение фонового процесса cpcsp/cades. Обрыв соединения COM.</td>
+            <td>Занулить ссылки (<code style="color: #38bdf8;">obj=null</code>), вызвать <code style="color: #38bdf8;">CollectGarbage()</code>, пауза 2 сек и авто-повтор документа.</td>
+          </tr>
+          <tr>
+            <td class="pill">0x8007000E</td>
+            <td>E_OUTOFMEMORY</td>
+            <td>Исчерпание 32-битного адресного пространства 2 ГБ из-за Base64 BSTR строк.</td>
+            <td>Пакетирование по 10 файлов, зануление COM объектов и принудительный сбор мусора.</td>
+          </tr>
+          <tr>
+            <td class="pill">0x80090016</td>
+            <td>NTE_BAD_KEYSET</td>
+            <td>Токен извлечен из USB-порта во время пакета.</td>
+            <td>Сохранение контрольной точки, перевод пакета на паузу, ожидание повторного подключения токена.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TAB 4: Architecture Guide -->
+  <div id="tab-guide" class="tab-pane">
+    <div class="card">
+      <div class="card-title">
+        <span>Архитектура проверки зависаний и авто-перезапуска на чистом JS</span>
+      </div>
+      <div style="font-size: 13px; color: #cbd5e1; line-height: 1.7;">
+        <h3 style="color: #38bdf8; margin: 10px 0 5px;">1. Сторожевой таймер (Watchdog Loop)</h3>
+        <p>Каждые 1000 мс работает фоновый цикл <code style="color: #38bdf8;">setInterval(checkProcessHang, 1000)</code>. Он фиксирует отметку времени начала подписания текущего документа (<code style="color: #38bdf8;">docStartTime</code>). Если разница между текущим временем и <code style="color: #38bdf8;">docStartTime</code> превышает установленный таймаут (например, 15–30 секунд) — объявляется тревога <strong>«Процесс подвис»</strong>.</p>
+
+        <h3 style="color: #38bdf8; margin: 15px 0 5px;">2. Защита от «зомби-ответов» (Generation ID)</h3>
+        <p>Частая проблема при зависании: таймер перезапустил подписание, а через 10 секунд старый зависший вызов ActiveX вдруг отвис и вернул подпись, испортив счетчик очереди. Для предотвращения этого используется целочисленный токен поколения <code style="color: #38bdf8;">currentOperationId++</code>. Любые запоздалые ответы от зависшей попытки отбрасываются.</p>
+
+        <h3 style="color: #38bdf8; margin: 15px 0 5px;">3. Освобождение памяти перед перезапуском</h3>
+        <p>Перед повторным стартом скрипт принудительно зануляет все ссылки на COM: <code style="color: #38bdf8;">oSigner = null; oSignedData = null;</code> и выполняет сборку мусора JScript: <code style="color: #38bdf8;">window.CollectGarbage()</code>, чтобы очистить зависшие буферы драйвера.</p>
+
+        <h3 style="color: #38bdf8; margin: 15px 0 5px;">4. Немедленный автоматический перезапуск</h3>
+        <p>Скрипт увеличивает счетчик попыток документа (<code style="color: #38bdf8;">retryCount++</code>) и вызывает функцию <code style="color: #38bdf8;">stepSigning()</code> заново. Оператору не нужно нажимать никаких кнопок — подписание продолжается в автоматическом режиме!</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================================== -->
+<!-- ЧИСТЫЙ JAVASCRIPT: ДВИЖОК С КОНТРОЛЕМ ЗАВИСАНИЙ И АВТО-ПЕРЕЗАПУСКОМ    -->
+<!-- ====================================================================== -->
+<script type="text/javascript">
+(function() {
+  'use strict';
+
+  var STORAGE_KEY = 'CP_RESILIENT_BATCH_STATE';
+
+  // Исходный пакет документов
+  var DOCUMENTS = [
+    { id: "DOC-01", name: "УПД_№8412_ООО_СеверТранс.xml", size: "142 КБ", status: "pending", retries: 0 },
+    { id: "DOC-02", name: "Акт_приемки_№109_ПАО_Гарант.xml", size: "88 КБ", status: "pending", retries: 0 },
+    { id: "DOC-03", name: "Договор_поставки_№338-А.pdf", size: "1250 КБ", status: "pending", retries: 0 },
+    { id: "DOC-04", name: "Счет-фактура_№9021_Альфа.xml", size: "64 КБ", status: "pending", retries: 0 },
+    { id: "DOC-05", name: "УПД_№8413_ТехноСтрой.xml", size: "210 КБ", status: "pending", retries: 0 },
+    { id: "DOC-06", name: "Акт_сверки_взаиморасчетов_Q3.xml", size: "340 КБ", status: "pending", retries: 0 },
+    { id: "DOC-07", name: "Накладная_ТОРГ-12_№441.xml", size: "95 КБ", status: "pending", retries: 0 },
+    { id: "DOC-08", name: "Счет-фактура_№9022_Инвест.xml", size: "72 КБ", status: "pending", retries: 0 }
+  ];
+
+  var state = {
+    currentIndex: 0,
+    isRunning: false,
+    isPaused: false,
+    memoryMb: 195,
+    certThumb: "38FA5B74D1C35502A5092BC18C2C94FA5E6D8A12",
+    timeoutLimitSec: 5,         // Лимит ожидания одного документа в секундах
+    currentDocStartTime: 0,     // Отметка времени старта текущего документа
+    currentOperationId: 1,      // Токен поколения для отсечения зависших коллбеков
+    isCurrentlyHanging: false,  // Флаг искусственного или реального зависания
+    restartCount: 0             // Общее количество авто-перезапусков
+  };
+
+  // Логирование
+  function addLog(msg, type) {
+    var box = document.getElementById('logBox');
+    if (!box) return;
+    var time = new Date().toLocaleTimeString();
+    var cls = 'log-entry';
+    if (type === 'err') cls += ' log-err';
+    else if (type === 'warn') cls += ' log-warn';
+    else if (type === 'succ') cls += ' log-succ';
+    else if (type === 'sys') cls += ' log-sys';
+
+    var div = document.createElement('div');
+    div.className = cls;
+    div.innerHTML = '<span class="log-time">[' + time + ']</span> ' + msg;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  window.clearLogs = function() {
+    var box = document.getElementById('logBox');
+    if (box) box.innerHTML = '';
+  };
+
+  window.switchTab = function(tabId) {
+    var btns = document.querySelectorAll('.tab-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].className = 'tab-btn';
+    var panes = document.querySelectorAll('.tab-pane');
+    for (var j = 0; j < panes.length; j++) panes[j].className = 'tab-pane';
+
+    var targetPane = document.getElementById('tab-' + tabId);
+    if (targetPane) targetPane.className = 'tab-pane active';
+    if (event && event.target) event.target.className = 'tab-btn active';
+  };
+
+  window.updateTimeoutLimit = function(val) {
+    state.timeoutLimitSec = parseInt(val, 10) || 5;
+    document.getElementById('limitTimeLabel').innerHTML = state.timeoutLimitSec + '.0 с';
+    addLog('Лимит сторожевого таймера изменен на ' + state.timeoutLimitSec + ' сек.', 'sys');
+  };
+
+  function loadCheckpoint() {
+    try {
+      var raw = window.localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch(e) { return null; }
+  }
+
+  function saveCheckpoint(idx) {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        currentIndex: idx,
+        total: DOCUMENTS.length,
+        savedAt: new Date().getTime()
+      }));
+    } catch(e) {}
+  }
+
+  function clearCheckpoint() {
+    try { window.localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+  }
+
+  // Отрисовка документов
+  function renderDocs() {
+    var container = document.getElementById('docsList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    for (var i = 0; i < DOCUMENTS.length; i++) {
+      var d = DOCUMENTS[i];
+      var div = document.createElement('div');
+      var cls = 'doc-item';
+      if (i === state.currentIndex && state.isRunning) {
+        cls += state.isCurrentlyHanging ? ' stalled' : ' active';
+      }
+      if (d.status === 'signed') cls += ' signed';
+      if (d.status === 'retrying') cls += ' retrying';
+
+      var badgeText = 'Ожидание';
+      var badgeCls = 'badge';
+      if (d.status === 'signed') {
+        badgeText = '✓ Подписан';
+        badgeCls = 'badge badge-success';
+      } else if (d.status === 'signing') {
+        badgeText = state.isCurrentlyHanging ? 'ПОДВИС...' : 'CAdESCOM...';
+        badgeCls = state.isCurrentlyHanging ? 'badge badge-danger' : 'badge badge-warn';
+      } else if (d.status === 'retrying') {
+        badgeText = 'Повтор #' + d.retries;
+        badgeCls = 'badge badge-warn';
+      } else if (d.status === 'failed') {
+        badgeText = 'Сбой';
+        badgeCls = 'badge badge-danger';
+      }
+
+      div.className = cls;
+      div.innerHTML = '<div class="doc-name">' + (i + 1) + '. ' + d.name + ' (' + d.size + ')</div>' +
+                      '<span class="' + badgeCls + '">' + badgeText + '</span>';
+      container.appendChild(div);
+    }
+
+    var signed = 0;
+    for (var k = 0; k < DOCUMENTS.length; k++) {
+      if (DOCUMENTS[k].status === 'signed') signed++;
+    }
+    var pct = Math.round((signed / DOCUMENTS.length) * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').innerHTML = signed + ' / ' + DOCUMENTS.length + ' документов (' + pct + '%)';
+    document.getElementById('memoryText').innerHTML = state.memoryMb + ' МБ';
+    document.getElementById('restartCountLabel').innerHTML = state.restartCount;
+  }
+
+  // ========================================================================
+  // ГЛАВНЫЙ СТОРОЖЕВОЙ ТАЙМЕР (WATCHDOG MONITOR)
+  // Проверяет каждую секунду, не подвис ли процесс подписания
+  // ========================================================================
+  setInterval(function checkProcessHang() {
+    var pulse = document.getElementById('pulseDot');
+    var bar = document.getElementById('watchdogBar');
+    var timeLabel = document.getElementById('currentDocTime');
+    var statusText = document.getElementById('watchdogStatusText');
+
+    if (!state.isRunning || state.currentIndex >= DOCUMENTS.length) {
+      if (pulse) pulse.className = 'pulse-dot';
+      if (bar) { bar.style.width = '0%'; bar.className = 'watchdog-bar'; }
+      if (timeLabel) timeLabel.innerHTML = '0.0 с';
+      return;
+    }
+
+    // Если идет процесс подписания
+    var now = new Date().getTime();
+    var elapsedMs = now - state.currentDocStartTime;
+    var elapsedSec = (elapsedMs / 1000);
+    if (timeLabel) timeLabel.innerHTML = elapsedSec.toFixed(1) + ' с';
+
+    var pct = Math.min(100, (elapsedSec / state.timeoutLimitSec) * 100);
+    if (bar) {
+      bar.style.width = pct + '%';
+      if (pct > 70) {
+        bar.className = 'watchdog-bar alert';
+        if (pulse) pulse.className = 'pulse-dot stalled';
+      } else {
+        bar.className = 'watchdog-bar';
+        if (pulse) pulse.className = 'pulse-dot';
+      }
+    }
+
+    // ПРОВЕРКА: ПРЕВЫШЕН ЛИ ТАЙМАУТ ЗАВИСАНИЯ?
+    if (elapsedSec >= state.timeoutLimitSec) {
+      // ПРОЦЕСС ПОДВИС! ЗАПУСКАЕМ АВТО-ПЕРЕЗАПУСК!
+      triggerWatchdogHangRecovery();
+    }
+  }, 500);
+
+  // Процедура авто-перезапуска при обнаружении зависания
+  function triggerWatchdogHangRecovery() {
+    var doc = DOCUMENTS[state.currentIndex];
+    state.isCurrentlyHanging = false;
+    state.restartCount++;
+
+    addLog('🚨 СТОРОЖЕВОЙ ТАЙМЕР: ОБНАРУЖЕНО ЗАВИСАНИЕ ПРОЦЕССА! Документ #' + (state.currentIndex + 1) + ' не отвечает ' + state.timeoutLimitSec + ' сек.', 'err');
+    addLog('Сброс зависшего дескриптора COM и аннулирование старого callback (Generation #' + state.currentOperationId + ')...', 'warn');
+
+    // 1. Аннулируем токен поколения текущей операции
+    state.currentOperationId++;
+
+    // 2. Принудительно очищаем COM память
+    if (typeof window.CollectGarbage === 'function') {
+      window.CollectGarbage();
+    }
+
+    // 3. Отмечаем документ как retrying
+    doc.retries = (doc.retries || 0) + 1;
+    doc.status = 'retrying';
+    renderDocs();
+
+    document.getElementById('watchdogStatusText').innerHTML = 'Перезапуск после зависания...';
+    document.getElementById('batchStatusBadge').innerHTML = 'Перезапуск...';
+    document.getElementById('batchStatusBadge').className = 'badge badge-danger';
+
+    // 4. АВТОМАТИЧЕСКИЙ ПЕРЕЗАПУСК ПОДПИСАНИЯ БЕЗ УЧАСТИЯ ОПЕРАТОРА
+    setTimeout(function() {
+      addLog('🔄 АВТО-ПЕРЕЗАПУСК: Повторный запуск подписания документа #' + (state.currentIndex + 1) + ' (' + doc.name + ')...', 'succ');
+      document.getElementById('watchdogStatusText').innerHTML = 'Мониторинг активен (1 сек)';
+      document.getElementById('batchStatusBadge').innerHTML = 'В процессе';
+      document.getElementById('batchStatusBadge').className = 'badge badge-warn';
+      stepSigning();
+    }, 1200);
+  }
+
+  // Запуск / Возобновление подписания
+  window.startOrResumeSigning = function() {
+    if (state.isRunning) return;
+
+    state.isRunning = true;
+    state.isPaused = false;
+    state.isCurrentlyHanging = false;
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnPause').disabled = false;
+    document.getElementById('batchStatusBadge').innerHTML = 'В процессе';
+    document.getElementById('batchStatusBadge').className = 'badge badge-warn';
+
+    addLog('Запуск процесса пакетного подписания со сторожевым контролем...', 'sys');
+    stepSigning();
+  };
+
+  window.pauseSigning = function() {
+    state.isRunning = false;
+    state.isPaused = true;
+    state.isCurrentlyHanging = false;
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnPause').disabled = true;
+    document.getElementById('batchStatusBadge').innerHTML = 'На паузе';
+    document.getElementById('batchStatusBadge').className = 'badge';
+    addLog('Пакет приостановлен оператором.', 'warn');
+  };
+
+  window.resetBatch = function() {
+    state.isRunning = false;
+    state.isPaused = false;
+    state.isCurrentlyHanging = false;
+    state.currentIndex = 0;
+    state.memoryMb = 195;
+    state.restartCount = 0;
+    clearCheckpoint();
+
+    for (var i = 0; i < DOCUMENTS.length; i++) {
+      DOCUMENTS[i].status = 'pending';
+      DOCUMENTS[i].retries = 0;
+    }
+
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnPause').disabled = true;
+    document.getElementById('batchStatusBadge').innerHTML = 'Сброшено';
+    document.getElementById('batchStatusBadge').className = 'badge';
+    renderDocs();
+    addLog('Состояние пакета, счетчики зависаний и LocalStorage очищены.', 'sys');
+  };
+
+  // Шаг цикла подписания одного документа
+  function stepSigning() {
+    if (!state.isRunning) return;
+
+    if (state.currentIndex >= DOCUMENTS.length) {
+      state.isRunning = false;
+      document.getElementById('btnStart').disabled = false;
+      document.getElementById('btnPause').disabled = true;
+      document.getElementById('batchStatusBadge').innerHTML = 'Завершено';
+      document.getElementById('batchStatusBadge').className = 'badge badge-success';
+      clearCheckpoint();
+      addLog('ВСЕ ДОКУМЕНТЫ УСПЕШНО ПОДПИСАНЫ! Контрольная точка очищена.', 'succ');
+      renderDocs();
+      return;
+    }
+
+    var doc = DOCUMENTS[state.currentIndex];
+    doc.status = 'signing';
+    state.currentDocStartTime = new Date().getTime(); // Засекаем время для Watchdog
+    var opId = state.currentOperationId;             // Запоминаем ID поколения операции
+
+    renderDocs();
+    addLog('Подписание документа #' + (state.currentIndex + 1) + ': ' + doc.name + '...');
+
+    // Имитация вызова ActiveX подписи (CAdESCOM.CadesSignedData.SignCades)
+    setTimeout(function() {
+      // Если пока мы подписывали, сторожевой таймер сработал и сменил opId — игнорируем зомби-вызов!
+      if (opId !== state.currentOperationId) {
+        addLog('Отброшен устаревший ответ от зависшей операции #' + opId, 'sys');
+        return;
+      }
+
+      // Если искусственно включено зависание — ничего не делаем, ждем срабатывания Watchdog
+      if (state.isCurrentlyHanging) {
+        addLog('Операция заблокирована (эмуляция зависания окна PIN / COM)...', 'warn');
+        return;
+      }
+
+      if (!state.isRunning) return;
+
+      // Успешно подписано
+      doc.status = 'signed';
+      state.currentIndex++;
+      saveCheckpoint(state.currentIndex);
+
+      // Контроль памяти: обнуление и CollectGarbage
+      if (state.currentIndex % 2 === 0) {
+        state.memoryMb = Math.max(195, state.memoryMb - 15);
+        if (typeof window.CollectGarbage === 'function') {
+          window.CollectGarbage(); // нативный сборщик мусора IE
+        }
+        addLog('Освобождение COM-ссылок и вызов CollectGarbage()', 'sys');
+      } else {
+        state.memoryMb += 10;
+      }
+
+      addLog('Документ #' + state.currentIndex + ' подписан (CAdES-BES). Контрольная точка сохранена.', 'succ');
+      renderDocs();
+
+      // Неблокирующий переход к следующему файлу
+      setTimeout(stepSigning, 180);
+    }, 550);
+  }
+
+  // Кнопка проверки зависания
+  window.simulateHangAndWatchdogRestart = function() {
+    if (!state.isRunning) {
+      // Если еще не запущен, запускаем и сразу морозим
+      window.startOrResumeSigning();
+    }
+    state.isCurrentlyHanging = true;
+    renderDocs();
+    addLog('🛑 ИМИТАЦИЯ ЗАВИСАНИЯ: Модальное окно ввода PIN-кода (cpui.dll) заблокировало поток выполнения!', 'err');
+    addLog('Сторожевой таймер отсчитывает время неактивности до авто-перезапуска...', 'warn');
+  };
+
+  // Другие инъекции сбоев
+  window.injectCrash = function(type) {
+    if (type === '0x800706BA') {
+      addLog('СБОЙ: 0x800706BA (Сервер RPC недоступен / падение cpcsp.dll)', 'err');
+      state.isRunning = false;
+      document.getElementById('batchStatusBadge').innerHTML = 'Сбой 0x800706BA';
+      document.getElementById('batchStatusBadge').className = 'badge badge-danger';
+
+      addLog('ОТКАЗОУСТОЙЧИВЫЙ ОБРАБОТЧИК: перехват COM-исключения, зануление ссылок...', 'warn');
+      setTimeout(function() {
+        if (typeof window.CollectGarbage === 'function') window.CollectGarbage();
+        addLog('Соединение восстановлено. Возобновление с документа #' + (state.currentIndex + 1), 'succ');
+        state.isRunning = true;
+        document.getElementById('batchStatusBadge').innerHTML = 'В процессе';
+        document.getElementById('batchStatusBadge').className = 'badge badge-warn';
+        stepSigning();
+      }, 1500);
+
+    } else if (type === '0x80090016') {
+      addLog('СБОЙ: 0x80090016 (Набор ключей не существует / Токен извлечен из USB)', 'err');
+      state.isRunning = false;
+      document.getElementById('batchStatusBadge').innerHTML = 'Ожидание токена';
+      document.getElementById('batchStatusBadge').className = 'badge badge-danger';
+
+      addLog('Пакет приостановлен. Контрольная точка docIndex=' + state.currentIndex + ' сохранена.', 'warn');
+      setTimeout(function() {
+        addLog('USB-носитель обнаружен. Контекст криптопровайдера инициализирован.', 'succ');
+        state.isRunning = true;
+        document.getElementById('batchStatusBadge').innerHTML = 'В процессе';
+        document.getElementById('batchStatusBadge').className = 'badge badge-warn';
+        stepSigning();
+      }, 2000);
+
+    } else if (type === 'RELOAD') {
+      addLog('ИМИТАЦИЯ КРАХА БРАУЗЕРА / НАЖАТИЯ F5...', 'err');
+      state.isRunning = false;
+      setTimeout(function() {
+        checkAutoResumeOnLoad();
+      }, 500);
+    }
+  };
+
+  function checkAutoResumeOnLoad() {
+    var saved = loadCheckpoint();
+    if (saved && saved.currentIndex > 0 && saved.currentIndex < DOCUMENTS.length) {
+      state.currentIndex = saved.currentIndex;
+      for (var i = 0; i < saved.currentIndex; i++) {
+        DOCUMENTS[i].status = 'signed';
+      }
+      renderDocs();
+      addLog('ОБНАРУЖЕНА НЕЗАВЕРШЕННАЯ СЕССИЯ: ранее подписано ' + saved.currentIndex + ' файлов.', 'warn');
+      addLog('Нажмите "Начать / Возобновить" для продолжения с документа #' + (saved.currentIndex + 1) + '.', 'succ');
+      document.getElementById('batchStatusBadge').innerHTML = 'Восстановлено (#' + (saved.currentIndex + 1) + ')';
+      document.getElementById('batchStatusBadge').className = 'badge badge-warn';
+    } else {
+      renderDocs();
+      addLog('Подсистема КриптоПро инициализирована. Сторожевой таймер активен.', 'sys');
+    }
+  }
+
+  window.copyPureCode = function() {
+    var code = document.getElementById('pureJsCodeView').innerText;
+    navigator.clipboard.writeText(code);
+    alert('Код с проверкой зависаний скопирован в буфер обмена!');
+  };
+
+  // Код для вкладки "Исходный код"
+  var pureCodeString = 
+'// ==========================================================================\\n' +
+'// Пакетное подписание через КриптоПро в IE с проверкой зависаний (Watchdog)\\n' +
+'// 100% Чистый JavaScript (ES5) - без библиотек\\n' +
+'// ==========================================================================\\n' +
+'function ResilientBatchSigner(docs, thumbprint, maxTimeoutSec) {\\n' +
+'    var STORAGE_KEY = "CP_BATCH_STATE";\\n' +
+'    var TIMEOUT_SEC = maxTimeoutSec || 30; // таймаут на 1 документ (PIN-код)\\n' +
+'    var currentIndex = 0;\\n' +
+'    var currentStartTime = 0;\\n' +
+'    var currentOpId = 1;\\n' +
+'    var isRunning = false;\\n\\n' +
+'    // 1. Восстановление с контрольной точки\\n' +
+'    var saved = localStorage.getItem(STORAGE_KEY);\\n' +
+'    if (saved) {\\n' +
+'        currentIndex = JSON.parse(saved).currentIndex || 0;\\n' +
+'    }\\n\\n' +
+'    // 2. СТОРОЖЕВОЙ ИНТЕРВАЛЬНЫЙ ТАЙМЕР ПРОВЕРКИ ЗАВИСАНИЙ\\n' +
+'    setInterval(function checkHang() {\\n' +
+'        if (!isRunning || currentIndex >= docs.length) return;\\n' +
+'        var elapsed = (new Date().getTime() - currentStartTime) / 1000;\\n' +
+'        if (elapsed > TIMEOUT_SEC) {\\n' +
+'            console.warn("ВНИМАНИЕ: Процесс подписания документа #" + (currentIndex + 1) + " подвис!");\\n' +
+'            currentOpId++; // Аннулируем старый дескриптор/коллбек\\n' +
+'            if (window.CollectGarbage) window.CollectGarbage(); // Очистка COM\\n' +
+'            console.log("Автоматический перезапуск подписания...");\\n' +
+'            setTimeout(processNext, 1000); // АВТО-ПЕРЕЗАПУСК\\n' +
+'        }\\n' +
+'    }, 1000);\\n\\n' +
+'    function processNext() {\\n' +
+'        if (currentIndex >= docs.length) {\\n' +
+'            isRunning = false;\\n' +
+'            localStorage.removeItem(STORAGE_KEY);\\n' +
+'            return alert("Все документы успешно подписаны!");\\n' +
+'        }\\n\\n' +
+'        isRunning = true;\\n' +
+'        currentStartTime = new Date().getTime();\\n' +
+'        var thisOpId = currentOpId;\\n\\n' +
+'        signDoc(docs[currentIndex], thumbprint, function(err, sig) {\\n' +
+'            // Если операция уже была перезапущена по таймауту - отбрасываем зомби-ответ\\n' +
+'            if (thisOpId !== currentOpId) return;\\n\\n' +
+'            if (err) {\\n' +
+'                if (err.hex === "0x800706BA") {\\n' +
+'                    return setTimeout(processNext, 2000); // автоповтор при сбое RPC\\n' +
+'                }\\n' +
+'                return alert("Ошибка: " + err.message);\\n' +
+'            }\\n\\n' +
+'            currentIndex++;\\n' +
+'            localStorage.setItem(STORAGE_KEY, JSON.stringify({ currentIndex: currentIndex }));\\n\\n' +
+'            // Очистка памяти COM каждые 5 документов\\n' +
+'            if (currentIndex % 5 === 0 && window.CollectGarbage) {\\n' +
+'                window.CollectGarbage();\\n' +
+'            }\\n' +
+'            setTimeout(processNext, 50);\\n' +
+'        });\\n' +
+'    }\\n\\n' +
+'    return { start: processNext };\\n' +
+'}\\n\\n' +
+'function signDoc(doc, thumbprint, cb) {\\n' +
+'    var oSigner = null, oSignedData = null, oStore = null;\\n' +
+'    try {\\n' +
+'        oStore = new ActiveXObject("CAdESCOM.Store");\\n' +
+'        oStore.Open(2, "My", 2);\\n' +
+'        var certs = oStore.Certificates.Find(0, thumbprint);\\n' +
+'        if (certs.Count === 0) throw new Error("Сертификат не найден в Личных");\\n\\n' +
+'        oSigner = new ActiveXObject("CAdESCOM.CPSigner");\\n' +
+'        oSigner.Certificate = certs.Item(1);\\n\\n' +
+'        oSignedData = new ActiveXObject("CAdESCOM.CadesSignedData");\\n' +
+'        oSignedData.ContentEncoding = 1;\\n' +
+'        oSignedData.Content = doc.base64;\\n\\n' +
+'        var signature = oSignedData.SignCades(oSigner, 1, true);\\n' +
+'        cb(null, signature);\\n' +
+'    } catch(e) {\\n' +
+'        e.hex = "0x" + ((e.number >>> 0).toString(16).toUpperCase());\\n' +
+'        cb(e);\\n' +
+'    } finally {\\n' +
+'        if (oStore) { try { oStore.Close(); } catch(ex){} }\\n' +
+'        oStore = null; oSigner = null; oSignedData = null;\\n' +
+'        if (window.CollectGarbage) window.CollectGarbage();\\n' +
+'    }\\n' +
+'}';
+
+  window.onload = function() {
+    var view = document.getElementById('pureJsCodeView');
+    if (view) view.innerText = pureCodeString.replace(/\\n/g, '\n');
+    checkAutoResumeOnLoad();
+  };
+})();
+</script>
+
+</body>
+</html>
