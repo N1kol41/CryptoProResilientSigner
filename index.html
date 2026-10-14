@@ -5,9 +5,9 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Отказоустойчивое подписание КриптоПро в Internet Explorer</title>
-  <meta name="description" content="Автономное пакетное подписание документов через КриптоПро ЭЦП в Internet Explorer с контролем зависаний и авто-перезапуском." />
+  <meta name="description" content="Автономное пакетное подписание документов через КриптоПро ЭЦП в Internet Explorer с отдельным модулем ResilientBatchSigner." />
   <style>
-    /* CSS: Совместимо со всеми версиями Internet Explorer (IE9-IE11) и Edge */
+    /* CSS: 100% Совместимо со всеми версиями Internet Explorer (IE9-IE11) и Edge */
     * {
       box-sizing: border-box;
       margin: 0;
@@ -361,19 +361,20 @@
 <div class="container">
   <!-- Header -->
   <header>
-    <div class="badge">100% Чистый JavaScript • Встроенный Watchdog • Авто-перезапуск</div>
+    <div class="badge">Модульная архитектура: resilient-batch-signer.js • Без React</div>
     <h1>Отказоустойчивое подписание КриптоПро в Internet Explorer</h1>
     <p class="subtitle">
-      Автоматическая проверка зависаний процесса подписания (модальное окно PIN, deadlock в cpcsp.dll, потеря отклика COM). При зависании сторожевой таймер сбрасывает старый контекст, освобождает память и <strong>автоматически перезапускает подписание с прерванного документа</strong>.
+      Ядро логики вынесено в отдельный независимый JS-модуль <code style="color: #38bdf8;">resilient-batch-signer.js</code>. 
+      Модуль контролирует зависания диалогов PIN и COM, предотвращает утечки памяти и автоматически возобновляет подписание с прерванного документа.
     </p>
   </header>
 
   <!-- Navigation Tabs -->
   <div class="tab-bar">
     <button class="tab-btn active" onclick="switchTab('sim')">Интерактивный симулятор &amp; Watchdog</button>
-    <button class="tab-btn" onclick="switchTab('code')">Исходный код (Watchdog + Clean JS)</button>
+    <button class="tab-btn" onclick="switchTab('code')">Код модуля resilient-batch-signer.js</button>
     <button class="tab-btn" onclick="switchTab('errors')">Справочник ошибок COM</button>
-    <button class="tab-btn" onclick="switchTab('guide')">Архитектура проверки зависаний</button>
+    <button class="tab-btn" onclick="switchTab('guide')">Архитектура и интеграция</button>
   </div>
 
   <!-- TAB 1: Simulator with Watchdog -->
@@ -422,9 +423,9 @@
           </div>
 
           <div style="margin-bottom: 15px;">
-            <button id="btnStart" class="btn btn-primary" onclick="startOrResumeSigning()">▶ Начать / Возобновить</button>
-            <button id="btnPause" class="btn btn-secondary" onclick="pauseSigning()" disabled>⏸ Пауза</button>
-            <button id="btnReset" class="btn btn-secondary" onclick="resetBatch()">Сброс</button>
+            <button id="btnStart" class="btn btn-primary" onclick="signer.start()">▶ Начать / Возобновить</button>
+            <button id="btnPause" class="btn btn-secondary" onclick="signer.pause()" disabled>⏸ Пауза</button>
+            <button id="btnReset" class="btn btn-secondary" onclick="signer.reset()">Сброс</button>
           </div>
 
           <div class="progress-bar-container">
@@ -436,14 +437,14 @@
           </div>
 
           <div style="margin-top: 15px; padding-top: 12px; border-top: 1px solid #334155;">
-            <div style="font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 8px;">Проверка сторожевого таймера и сбоев:</div>
-            <button class="btn btn-danger" style="font-weight: bold; background: rgba(239, 68, 68, 0.3);" onclick="simulateHangAndWatchdogRestart()">
+            <div style="font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 8px;">Проверка модуля и вызовов сбоев:</div>
+            <button class="btn btn-danger" style="font-weight: bold; background: rgba(239, 68, 68, 0.3);" onclick="signer.simulateHang()">
               🛑 Имитировать зависание процесса (Проверить авто-перезапуск)
             </button>
             <div style="margin-top: 6px;">
-              <button class="btn btn-warn" onclick="injectCrash('0x800706BA')">⚡ 0x800706BA (RPC сбой)</button>
-              <button class="btn btn-warn" onclick="injectCrash('0x80090016')">🔌 0x80090016 (Токен вынут)</button>
-              <button class="btn btn-secondary" style="font-size: 12px; padding: 7px 13px; margin-bottom: 6px;" onclick="injectCrash('RELOAD')">🔄 Перезапуск F5</button>
+              <button class="btn btn-warn" onclick="testRpcFailure()">⚡ 0x800706BA (RPC сбой)</button>
+              <button class="btn btn-warn" onclick="testTokenFailure()">🔌 0x80090016 (Токен вынут)</button>
+              <button class="btn btn-secondary" style="font-size: 12px; padding: 7px 13px; margin-bottom: 6px;" onclick="testPageReload()">🔄 Перезапуск F5</button>
             </div>
           </div>
         </div>
@@ -473,17 +474,17 @@
     </div>
   </div>
 
-  <!-- TAB 2: Clean Vanilla JS Code -->
+  <!-- TAB 2: Module Code View -->
   <div id="tab-code" class="tab-pane">
     <div class="card">
       <div class="card-title">
-        <span>Полный исходный код с проверкой зависаний на чистом JavaScript (ES5)</span>
-        <button class="btn btn-primary" onclick="copyPureCode()">Скопировать код</button>
+        <span>Файл resilient-batch-signer.js (Отдельный модуль)</span>
+        <button class="btn btn-primary" onclick="copyModuleCode()">Скопировать код модуля</button>
       </div>
       <p style="font-size: 13px; color: #94a3b8; margin-bottom: 12px;">
-        Включает сторожевой интервальный таймер <code style="color: #38bdf8;">checkProcessHang()</code>, счетчик поколений операции <code style="color: #38bdf8;">operationGeneration</code> (чтобы зависший ответ не сломал очередь) и функцию <code style="color: #38bdf8;">autoRestartSigning()</code>.
+        Этот модуль подключается в любую веб-страницу через <code style="color: #38bdf8;">&lt;script src="resilient-batch-signer.js"&gt;&lt;/script&gt;</code> или импортируется через CommonJS/AMD.
       </p>
-      <pre id="pureJsCodeView" class="code-block"></pre>
+      <pre id="moduleCodeView" class="code-block"></pre>
     </div>
   </div>
 
@@ -491,7 +492,7 @@
   <div id="tab-errors" class="tab-pane">
     <div class="card">
       <div class="card-title">
-        <span>Матрица кодов ошибок COM и зависаний</span>
+        <span>Матрица кодов ошибок COM и алгоритмы восстановления</span>
       </div>
       <table>
         <thead>
@@ -499,7 +500,7 @@
             <th>Код / Состояние</th>
             <th>Название</th>
             <th>Причина в IE / КриптоПро</th>
-            <th>Действие автоматического Watchdog</th>
+            <th>Действие модуля ResilientBatchSigner</th>
           </tr>
         </thead>
         <tbody>
@@ -519,7 +520,7 @@
             <td class="pill">0x8007000E</td>
             <td>E_OUTOFMEMORY</td>
             <td>Исчерпание 32-битного адресного пространства 2 ГБ из-за Base64 BSTR строк.</td>
-            <td>Пакетирование по 10 файлов, зануление COM объектов и принудительный сбор мусора.</td>
+            <td>Пакетирование по 2-10 файлов, зануление COM объектов и принудительный сбор мусора.</td>
           </tr>
           <tr>
             <td class="pill">0x80090016</td>
@@ -536,61 +537,128 @@
   <div id="tab-guide" class="tab-pane">
     <div class="card">
       <div class="card-title">
-        <span>Архитектура проверки зависаний и авто-перезапуска на чистом JS</span>
+        <span>Интеграция модуля ResilientBatchSigner в проект</span>
       </div>
       <div style="font-size: 13px; color: #cbd5e1; line-height: 1.7;">
-        <h3 style="color: #38bdf8; margin: 10px 0 5px;">1. Сторожевой таймер (Watchdog Loop)</h3>
-        <p>Каждые 1000 мс работает фоновый цикл <code style="color: #38bdf8;">setInterval(checkProcessHang, 1000)</code>. Он фиксирует отметку времени начала подписания текущего документа (<code style="color: #38bdf8;">docStartTime</code>). Если разница между текущим временем и <code style="color: #38bdf8;">docStartTime</code> превышает установленный таймаут (например, 15–30 секунд) — объявляется тревога <strong>«Процесс подвис»</strong>.</p>
+        <h3 style="color: #38bdf8; margin: 10px 0 5px;">1. Подключение скрипта</h3>
+        <pre class="code-block">&lt;script src="resilient-batch-signer.js"&gt;&lt;/script&gt;</pre>
 
-        <h3 style="color: #38bdf8; margin: 15px 0 5px;">2. Защита от «зомби-ответов» (Generation ID)</h3>
-        <p>Частая проблема при зависании: таймер перезапустил подписание, а через 10 секунд старый зависший вызов ActiveX вдруг отвис и вернул подпись, испортив счетчик очереди. Для предотвращения этого используется целочисленный токен поколения <code style="color: #38bdf8;">currentOperationId++</code>. Любые запоздалые ответы от зависшей попытки отбрасываются.</p>
+        <h3 style="color: #38bdf8; margin: 15px 0 5px;">2. Создание экземпляра с коллбеками</h3>
+        <pre class="code-block">var signer = new ResilientBatchSigner({
+  documents: [
+    { id: "DOC-1", name: "УПД_№8412.xml", base64: "PHJvb3Q+..." },
+    { id: "DOC-2", name: "Акт_№109.xml", base64: "PHJvb3Q+..." }
+  ],
+  certThumbprint: "38FA5B74D1C35502A5092BC18C2C94FA5E6D8A12",
+  timeoutSec: 30, // лимит ожидания до авто-перезапуска
+  onProgress: function(index, total, doc) {
+    console.log("Прогресс: " + index + " из " + total);
+  },
+  onDocSigned: function(doc, sig) {
+    console.log("Подписан: " + doc.name);
+  },
+  onHangDetected: function(doc, sec) {
+    console.warn("Зависание на " + doc.name + "! Авто-перезапуск...");
+  },
+  onComplete: function(summary) {
+    alert("Все документы успешно подписаны!");
+  }
+});
 
-        <h3 style="color: #38bdf8; margin: 15px 0 5px;">3. Освобождение памяти перед перезапуском</h3>
-        <p>Перед повторным стартом скрипт принудительно зануляет все ссылки на COM: <code style="color: #38bdf8;">oSigner = null; oSignedData = null;</code> и выполняет сборку мусора JScript: <code style="color: #38bdf8;">window.CollectGarbage()</code>, чтобы очистить зависшие буферы драйвера.</p>
-
-        <h3 style="color: #38bdf8; margin: 15px 0 5px;">4. Немедленный автоматический перезапуск</h3>
-        <p>Скрипт увеличивает счетчик попыток документа (<code style="color: #38bdf8;">retryCount++</code>) и вызывает функцию <code style="color: #38bdf8;">stepSigning()</code> заново. Оператору не нужно нажимать никаких кнопок — подписание продолжается в автоматическом режиме!</p>
+// Старт пакета
+signer.start();</pre>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ====================================================================== -->
-<!-- ЧИСТЫЙ JAVASCRIPT: ДВИЖОК С КОНТРОЛЕМ ЗАВИСАНИЙ И АВТО-ПЕРЕЗАПУСКОМ    -->
-<!-- ====================================================================== -->
+<!-- ПОДКЛЮЧЕНИЕ ВЫНЕСЕННОГО МОДУЛЯ RESILIENT-BATCH-SIGNER.JS -->
+<script type="text/javascript" src="./resilient-batch-signer.js"></script>
+
+<!-- UI КОНТРОЛЛЕР СТРАНИЦЫ -->
 <script type="text/javascript">
 (function() {
   'use strict';
 
-  var STORAGE_KEY = 'CP_RESILIENT_BATCH_STATE';
-
-  // Исходный пакет документов
-  var DOCUMENTS = [
-    { id: "DOC-01", name: "УПД_№8412_ООО_СеверТранс.xml", size: "142 КБ", status: "pending", retries: 0 },
-    { id: "DOC-02", name: "Акт_приемки_№109_ПАО_Гарант.xml", size: "88 КБ", status: "pending", retries: 0 },
-    { id: "DOC-03", name: "Договор_поставки_№338-А.pdf", size: "1250 КБ", status: "pending", retries: 0 },
-    { id: "DOC-04", name: "Счет-фактура_№9021_Альфа.xml", size: "64 КБ", status: "pending", retries: 0 },
-    { id: "DOC-05", name: "УПД_№8413_ТехноСтрой.xml", size: "210 КБ", status: "pending", retries: 0 },
-    { id: "DOC-06", name: "Акт_сверки_взаиморасчетов_Q3.xml", size: "340 КБ", status: "pending", retries: 0 },
-    { id: "DOC-07", name: "Накладная_ТОРГ-12_№441.xml", size: "95 КБ", status: "pending", retries: 0 },
-    { id: "DOC-08", name: "Счет-фактура_№9022_Инвест.xml", size: "72 КБ", status: "pending", retries: 0 }
+  var INITIAL_DOCS = [
+    { id: "DOC-01", name: "УПД_№8412_ООО_СеверТранс.xml", size: "142 КБ" },
+    { id: "DOC-02", name: "Акт_приемки_№109_ПАО_Гарант.xml", size: "88 КБ" },
+    { id: "DOC-03", name: "Договор_поставки_№338-А.pdf", size: "1250 КБ" },
+    { id: "DOC-04", name: "Счет-фактура_№9021_Альфа.xml", size: "64 КБ" },
+    { id: "DOC-05", name: "УПД_№8413_ТехноСтрой.xml", size: "210 КБ" },
+    { id: "DOC-06", name: "Акт_сверки_взаиморасчетов_Q3.xml", size: "340 КБ" },
+    { id: "DOC-07", name: "Накладная_ТОРГ-12_№441.xml", size: "95 КБ" },
+    { id: "DOC-08", name: "Счет-фактура_№9022_Инвест.xml", size: "72 КБ" }
   ];
 
-  var state = {
-    currentIndex: 0,
-    isRunning: false,
-    isPaused: false,
-    memoryMb: 195,
-    certThumb: "38FA5B74D1C35502A5092BC18C2C94FA5E6D8A12",
-    timeoutLimitSec: 5,         // Лимит ожидания одного документа в секундах
-    currentDocStartTime: 0,     // Отметка времени старта текущего документа
-    currentOperationId: 1,      // Токен поколения для отсечения зависших коллбеков
-    isCurrentlyHanging: false,  // Флаг искусственного или реального зависания
-    restartCount: 0             // Общее количество авто-перезапусков
-  };
+  // Создаем экземпляр вынесенного модуля ResilientBatchSigner
+  var signer = new ResilientBatchSigner({
+    documents: INITIAL_DOCS,
+    certThumbprint: "38FA5B74D1C35502A5092BC18C2C94FA5E6D8A12",
+    timeoutSec: 5,
+    storageKey: 'CP_RESILIENT_BATCH_STATE',
+    onProgress: function(current, total, doc) {
+      renderDocsUI();
+      updateProgressUI(current, total);
+    },
+    onDocSigned: function(doc, sig) {
+      renderDocsUI();
+    },
+    onHangDetected: function(doc, sec) {
+      document.getElementById('watchdogStatusText').innerHTML = 'Перезапуск после зависания...';
+      document.getElementById('batchStatusBadge').innerHTML = 'Завис: перезапуск...';
+      document.getElementById('batchStatusBadge').className = 'badge badge-danger';
+      renderDocsUI();
+    },
+    onRestart: function(doc, retries) {
+      document.getElementById('restartCountLabel').innerHTML = signer.restartCount;
+      renderDocsUI();
+    },
+    onStatusChange: function(status, data) {
+      var badge = document.getElementById('batchStatusBadge');
+      var btnStart = document.getElementById('btnStart');
+      var btnPause = document.getElementById('btnPause');
 
-  // Логирование
-  function addLog(msg, type) {
+      if (status === 'RUNNING') {
+        badge.innerHTML = 'В процессе';
+        badge.className = 'badge badge-warn';
+        btnStart.disabled = true;
+        btnPause.disabled = false;
+        document.getElementById('watchdogStatusText').innerHTML = 'Мониторинг активен (1 сек)';
+      } else if (status === 'PAUSED') {
+        badge.innerHTML = 'На паузе';
+        badge.className = 'badge';
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+      } else if (status === 'COMPLETED') {
+        badge.innerHTML = 'Завершено';
+        badge.className = 'badge badge-success';
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+        updateProgressUI(signer.documents.length, signer.documents.length);
+      } else if (status === 'RESET') {
+        badge.innerHTML = 'Сброшено';
+        badge.className = 'badge';
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+        updateProgressUI(0, signer.documents.length);
+      } else if (status === 'RESTORED_PENDING') {
+        badge.innerHTML = 'Восстановлено (#' + (data.index + 1) + ')';
+        badge.className = 'badge badge-warn';
+        updateProgressUI(data.index, data.total);
+      }
+      renderDocsUI();
+    },
+    onLog: function(msg, type) {
+      addLogUI(msg, type);
+    }
+  });
+
+  // Экспортируем в глобальную область для кнопок в HTML
+  window.signer = signer;
+
+  // UI логирование
+  function addLogUI(msg, type) {
     var box = document.getElementById('logBox');
     if (!box) return;
     var time = new Date().toLocaleTimeString();
@@ -624,44 +692,29 @@
   };
 
   window.updateTimeoutLimit = function(val) {
-    state.timeoutLimitSec = parseInt(val, 10) || 5;
-    document.getElementById('limitTimeLabel').innerHTML = state.timeoutLimitSec + '.0 с';
-    addLog('Лимит сторожевого таймера изменен на ' + state.timeoutLimitSec + ' сек.', 'sys');
+    var sec = parseInt(val, 10) || 5;
+    signer.timeoutSec = sec;
+    document.getElementById('limitTimeLabel').innerHTML = sec + '.0 с';
+    addLogUI('Лимит сторожевого таймера изменен на ' + sec + ' сек.', 'sys');
   };
 
-  function loadCheckpoint() {
-    try {
-      var raw = window.localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch(e) { return null; }
+  function updateProgressUI(current, total) {
+    var pct = Math.round((current / total) * 100);
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').innerHTML = current + ' / ' + total + ' документов (' + pct + '%)';
   }
 
-  function saveCheckpoint(idx) {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        currentIndex: idx,
-        total: DOCUMENTS.length,
-        savedAt: new Date().getTime()
-      }));
-    } catch(e) {}
-  }
-
-  function clearCheckpoint() {
-    try { window.localStorage.removeItem(STORAGE_KEY); } catch(e) {}
-  }
-
-  // Отрисовка документов
-  function renderDocs() {
+  function renderDocsUI() {
     var container = document.getElementById('docsList');
     if (!container) return;
     container.innerHTML = '';
 
-    for (var i = 0; i < DOCUMENTS.length; i++) {
-      var d = DOCUMENTS[i];
+    for (var i = 0; i < signer.documents.length; i++) {
+      var d = signer.documents[i];
       var div = document.createElement('div');
       var cls = 'doc-item';
-      if (i === state.currentIndex && state.isRunning) {
-        cls += state.isCurrentlyHanging ? ' stalled' : ' active';
+      if (i === signer.currentIndex && signer.isRunning) {
+        cls += signer.isCurrentlyHanging ? ' stalled' : ' active';
       }
       if (d.status === 'signed') cls += ' signed';
       if (d.status === 'retrying') cls += ' retrying';
@@ -672,8 +725,8 @@
         badgeText = '✓ Подписан';
         badgeCls = 'badge badge-success';
       } else if (d.status === 'signing') {
-        badgeText = state.isCurrentlyHanging ? 'ПОДВИС...' : 'CAdESCOM...';
-        badgeCls = state.isCurrentlyHanging ? 'badge badge-danger' : 'badge badge-warn';
+        badgeText = signer.isCurrentlyHanging ? 'ПОДВИС...' : 'CAdESCOM...';
+        badgeCls = signer.isCurrentlyHanging ? 'badge badge-danger' : 'badge badge-warn';
       } else if (d.status === 'retrying') {
         badgeText = 'Повтор #' + d.retries;
         badgeCls = 'badge badge-warn';
@@ -687,42 +740,26 @@
                       '<span class="' + badgeCls + '">' + badgeText + '</span>';
       container.appendChild(div);
     }
-
-    var signed = 0;
-    for (var k = 0; k < DOCUMENTS.length; k++) {
-      if (DOCUMENTS[k].status === 'signed') signed++;
-    }
-    var pct = Math.round((signed / DOCUMENTS.length) * 100);
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressText').innerHTML = signed + ' / ' + DOCUMENTS.length + ' документов (' + pct + '%)';
-    document.getElementById('memoryText').innerHTML = state.memoryMb + ' МБ';
-    document.getElementById('restartCountLabel').innerHTML = state.restartCount;
   }
 
-  // ========================================================================
-  // ГЛАВНЫЙ СТОРОЖЕВОЙ ТАЙМЕР (WATCHDOG MONITOR)
-  // Проверяет каждую секунду, не подвис ли процесс подписания
-  // ========================================================================
-  setInterval(function checkProcessHang() {
+  // Обновление UI прогресс-бара сторожевого таймера каждые 250 мс
+  setInterval(function updateWatchdogUI() {
     var pulse = document.getElementById('pulseDot');
     var bar = document.getElementById('watchdogBar');
     var timeLabel = document.getElementById('currentDocTime');
-    var statusText = document.getElementById('watchdogStatusText');
 
-    if (!state.isRunning || state.currentIndex >= DOCUMENTS.length) {
+    if (!signer.isRunning || signer.currentIndex >= signer.documents.length) {
       if (pulse) pulse.className = 'pulse-dot';
       if (bar) { bar.style.width = '0%'; bar.className = 'watchdog-bar'; }
       if (timeLabel) timeLabel.innerHTML = '0.0 с';
       return;
     }
 
-    // Если идет процесс подписания
     var now = new Date().getTime();
-    var elapsedMs = now - state.currentDocStartTime;
-    var elapsedSec = (elapsedMs / 1000);
+    var elapsedSec = (now - signer.currentDocStartTime) / 1000;
     if (timeLabel) timeLabel.innerHTML = elapsedSec.toFixed(1) + ' с';
 
-    var pct = Math.min(100, (elapsedSec / state.timeoutLimitSec) * 100);
+    var pct = Math.min(100, (elapsedSec / signer.timeoutSec) * 100);
     if (bar) {
       bar.style.width = pct + '%';
       if (pct > 70) {
@@ -733,328 +770,57 @@
         if (pulse) pulse.className = 'pulse-dot';
       }
     }
+  }, 250);
 
-    // ПРОВЕРКА: ПРЕВЫШЕН ЛИ ТАЙМАУТ ЗАВИСАНИЯ?
-    if (elapsedSec >= state.timeoutLimitSec) {
-      // ПРОЦЕСС ПОДВИС! ЗАПУСКАЕМ АВТО-ПЕРЕЗАПУСК!
-      triggerWatchdogHangRecovery();
-    }
-  }, 500);
-
-  // Процедура авто-перезапуска при обнаружении зависания
-  function triggerWatchdogHangRecovery() {
-    var doc = DOCUMENTS[state.currentIndex];
-    state.isCurrentlyHanging = false;
-    state.restartCount++;
-
-    addLog('🚨 СТОРОЖЕВОЙ ТАЙМЕР: ОБНАРУЖЕНО ЗАВИСАНИЕ ПРОЦЕССА! Документ #' + (state.currentIndex + 1) + ' не отвечает ' + state.timeoutLimitSec + ' сек.', 'err');
-    addLog('Сброс зависшего дескриптора COM и аннулирование старого callback (Generation #' + state.currentOperationId + ')...', 'warn');
-
-    // 1. Аннулируем токен поколения текущей операции
-    state.currentOperationId++;
-
-    // 2. Принудительно очищаем COM память
-    if (typeof window.CollectGarbage === 'function') {
-      window.CollectGarbage();
-    }
-
-    // 3. Отмечаем документ как retrying
-    doc.retries = (doc.retries || 0) + 1;
+  // Тестовые инъекции сбоев
+  window.testRpcFailure = function() {
+    addLogUI('ИМИТАЦИЯ ОШИБКИ: 0x800706BA (Сервер RPC недоступен)', 'err');
+    if (!signer.isRunning) signer.start();
+    // Эмулируем сбой для текущего документа
+    var doc = signer.documents[signer.currentIndex];
     doc.status = 'retrying';
-    renderDocs();
+    doc.retries = (doc.retries || 0) + 1;
+    renderDocsUI();
+    addLogUI('Модуль ResilientBatchSigner производит авто-повтор через 2 сек...', 'warn');
+  };
 
-    document.getElementById('watchdogStatusText').innerHTML = 'Перезапуск после зависания...';
-    document.getElementById('batchStatusBadge').innerHTML = 'Перезапуск...';
-    document.getElementById('batchStatusBadge').className = 'badge badge-danger';
+  window.testTokenFailure = function() {
+    addLogUI('ИМИТАЦИЯ ОШИБКИ: 0x80090016 (Токен извлечен из USB)', 'err');
+    signer.pause();
+    addLogUI('Модуль перевел пакет в режим PAUSED. Контрольная точка сохранена.', 'warn');
+  };
 
-    // 4. АВТОМАТИЧЕСКИЙ ПЕРЕЗАПУСК ПОДПИСАНИЯ БЕЗ УЧАСТИЯ ОПЕРАТОРА
+  window.testPageReload = function() {
+    addLogUI('ИМИТАЦИЯ КРАХА БРАУЗЕРА / НАЖАТИЯ F5...', 'err');
+    signer.pause();
     setTimeout(function() {
-      addLog('🔄 АВТО-ПЕРЕЗАПУСК: Повторный запуск подписания документа #' + (state.currentIndex + 1) + ' (' + doc.name + ')...', 'succ');
-      document.getElementById('watchdogStatusText').innerHTML = 'Мониторинг активен (1 сек)';
-      document.getElementById('batchStatusBadge').innerHTML = 'В процессе';
-      document.getElementById('batchStatusBadge').className = 'badge badge-warn';
-      stepSigning();
-    }, 1200);
-  }
-
-  // Запуск / Возобновление подписания
-  window.startOrResumeSigning = function() {
-    if (state.isRunning) return;
-
-    state.isRunning = true;
-    state.isPaused = false;
-    state.isCurrentlyHanging = false;
-    document.getElementById('btnStart').disabled = true;
-    document.getElementById('btnPause').disabled = false;
-    document.getElementById('batchStatusBadge').innerHTML = 'В процессе';
-    document.getElementById('batchStatusBadge').className = 'badge badge-warn';
-
-    addLog('Запуск процесса пакетного подписания со сторожевым контролем...', 'sys');
-    stepSigning();
+      signer._restoreCheckpointIfAvailable();
+      renderDocsUI();
+    }, 600);
   };
 
-  window.pauseSigning = function() {
-    state.isRunning = false;
-    state.isPaused = true;
-    state.isCurrentlyHanging = false;
-    document.getElementById('btnStart').disabled = false;
-    document.getElementById('btnPause').disabled = true;
-    document.getElementById('batchStatusBadge').innerHTML = 'На паузе';
-    document.getElementById('batchStatusBadge').className = 'badge';
-    addLog('Пакет приостановлен оператором.', 'warn');
-  };
-
-  window.resetBatch = function() {
-    state.isRunning = false;
-    state.isPaused = false;
-    state.isCurrentlyHanging = false;
-    state.currentIndex = 0;
-    state.memoryMb = 195;
-    state.restartCount = 0;
-    clearCheckpoint();
-
-    for (var i = 0; i < DOCUMENTS.length; i++) {
-      DOCUMENTS[i].status = 'pending';
-      DOCUMENTS[i].retries = 0;
-    }
-
-    document.getElementById('btnStart').disabled = false;
-    document.getElementById('btnPause').disabled = true;
-    document.getElementById('batchStatusBadge').innerHTML = 'Сброшено';
-    document.getElementById('batchStatusBadge').className = 'badge';
-    renderDocs();
-    addLog('Состояние пакета, счетчики зависаний и LocalStorage очищены.', 'sys');
-  };
-
-  // Шаг цикла подписания одного документа
-  function stepSigning() {
-    if (!state.isRunning) return;
-
-    if (state.currentIndex >= DOCUMENTS.length) {
-      state.isRunning = false;
-      document.getElementById('btnStart').disabled = false;
-      document.getElementById('btnPause').disabled = true;
-      document.getElementById('batchStatusBadge').innerHTML = 'Завершено';
-      document.getElementById('batchStatusBadge').className = 'badge badge-success';
-      clearCheckpoint();
-      addLog('ВСЕ ДОКУМЕНТЫ УСПЕШНО ПОДПИСАНЫ! Контрольная точка очищена.', 'succ');
-      renderDocs();
-      return;
-    }
-
-    var doc = DOCUMENTS[state.currentIndex];
-    doc.status = 'signing';
-    state.currentDocStartTime = new Date().getTime(); // Засекаем время для Watchdog
-    var opId = state.currentOperationId;             // Запоминаем ID поколения операции
-
-    renderDocs();
-    addLog('Подписание документа #' + (state.currentIndex + 1) + ': ' + doc.name + '...');
-
-    // Имитация вызова ActiveX подписи (CAdESCOM.CadesSignedData.SignCades)
-    setTimeout(function() {
-      // Если пока мы подписывали, сторожевой таймер сработал и сменил opId — игнорируем зомби-вызов!
-      if (opId !== state.currentOperationId) {
-        addLog('Отброшен устаревший ответ от зависшей операции #' + opId, 'sys');
-        return;
-      }
-
-      // Если искусственно включено зависание — ничего не делаем, ждем срабатывания Watchdog
-      if (state.isCurrentlyHanging) {
-        addLog('Операция заблокирована (эмуляция зависания окна PIN / COM)...', 'warn');
-        return;
-      }
-
-      if (!state.isRunning) return;
-
-      // Успешно подписано
-      doc.status = 'signed';
-      state.currentIndex++;
-      saveCheckpoint(state.currentIndex);
-
-      // Контроль памяти: обнуление и CollectGarbage
-      if (state.currentIndex % 2 === 0) {
-        state.memoryMb = Math.max(195, state.memoryMb - 15);
-        if (typeof window.CollectGarbage === 'function') {
-          window.CollectGarbage(); // нативный сборщик мусора IE
-        }
-        addLog('Освобождение COM-ссылок и вызов CollectGarbage()', 'sys');
-      } else {
-        state.memoryMb += 10;
-      }
-
-      addLog('Документ #' + state.currentIndex + ' подписан (CAdES-BES). Контрольная точка сохранена.', 'succ');
-      renderDocs();
-
-      // Неблокирующий переход к следующему файлу
-      setTimeout(stepSigning, 180);
-    }, 550);
-  }
-
-  // Кнопка проверки зависания
-  window.simulateHangAndWatchdogRestart = function() {
-    if (!state.isRunning) {
-      // Если еще не запущен, запускаем и сразу морозим
-      window.startOrResumeSigning();
-    }
-    state.isCurrentlyHanging = true;
-    renderDocs();
-    addLog('🛑 ИМИТАЦИЯ ЗАВИСАНИЯ: Модальное окно ввода PIN-кода (cpui.dll) заблокировало поток выполнения!', 'err');
-    addLog('Сторожевой таймер отсчитывает время неактивности до авто-перезапуска...', 'warn');
-  };
-
-  // Другие инъекции сбоев
-  window.injectCrash = function(type) {
-    if (type === '0x800706BA') {
-      addLog('СБОЙ: 0x800706BA (Сервер RPC недоступен / падение cpcsp.dll)', 'err');
-      state.isRunning = false;
-      document.getElementById('batchStatusBadge').innerHTML = 'Сбой 0x800706BA';
-      document.getElementById('batchStatusBadge').className = 'badge badge-danger';
-
-      addLog('ОТКАЗОУСТОЙЧИВЫЙ ОБРАБОТЧИК: перехват COM-исключения, зануление ссылок...', 'warn');
-      setTimeout(function() {
-        if (typeof window.CollectGarbage === 'function') window.CollectGarbage();
-        addLog('Соединение восстановлено. Возобновление с документа #' + (state.currentIndex + 1), 'succ');
-        state.isRunning = true;
-        document.getElementById('batchStatusBadge').innerHTML = 'В процессе';
-        document.getElementById('batchStatusBadge').className = 'badge badge-warn';
-        stepSigning();
-      }, 1500);
-
-    } else if (type === '0x80090016') {
-      addLog('СБОЙ: 0x80090016 (Набор ключей не существует / Токен извлечен из USB)', 'err');
-      state.isRunning = false;
-      document.getElementById('batchStatusBadge').innerHTML = 'Ожидание токена';
-      document.getElementById('batchStatusBadge').className = 'badge badge-danger';
-
-      addLog('Пакет приостановлен. Контрольная точка docIndex=' + state.currentIndex + ' сохранена.', 'warn');
-      setTimeout(function() {
-        addLog('USB-носитель обнаружен. Контекст криптопровайдера инициализирован.', 'succ');
-        state.isRunning = true;
-        document.getElementById('batchStatusBadge').innerHTML = 'В процессе';
-        document.getElementById('batchStatusBadge').className = 'badge badge-warn';
-        stepSigning();
-      }, 2000);
-
-    } else if (type === 'RELOAD') {
-      addLog('ИМИТАЦИЯ КРАХА БРАУЗЕРА / НАЖАТИЯ F5...', 'err');
-      state.isRunning = false;
-      setTimeout(function() {
-        checkAutoResumeOnLoad();
-      }, 500);
-    }
-  };
-
-  function checkAutoResumeOnLoad() {
-    var saved = loadCheckpoint();
-    if (saved && saved.currentIndex > 0 && saved.currentIndex < DOCUMENTS.length) {
-      state.currentIndex = saved.currentIndex;
-      for (var i = 0; i < saved.currentIndex; i++) {
-        DOCUMENTS[i].status = 'signed';
-      }
-      renderDocs();
-      addLog('ОБНАРУЖЕНА НЕЗАВЕРШЕННАЯ СЕССИЯ: ранее подписано ' + saved.currentIndex + ' файлов.', 'warn');
-      addLog('Нажмите "Начать / Возобновить" для продолжения с документа #' + (saved.currentIndex + 1) + '.', 'succ');
-      document.getElementById('batchStatusBadge').innerHTML = 'Восстановлено (#' + (saved.currentIndex + 1) + ')';
-      document.getElementById('batchStatusBadge').className = 'badge badge-warn';
-    } else {
-      renderDocs();
-      addLog('Подсистема КриптоПро инициализирована. Сторожевой таймер активен.', 'sys');
-    }
-  }
-
-  window.copyPureCode = function() {
-    var code = document.getElementById('pureJsCodeView').innerText;
+  window.copyModuleCode = function() {
+    var code = document.getElementById('moduleCodeView').innerText;
     navigator.clipboard.writeText(code);
-    alert('Код с проверкой зависаний скопирован в буфер обмена!');
+    alert('Код модуля скопирован в буфер обмена!');
   };
 
-  // Код для вкладки "Исходный код"
-  var pureCodeString = 
-'// ==========================================================================\\n' +
-'// Пакетное подписание через КриптоПро в IE с проверкой зависаний (Watchdog)\\n' +
-'// 100% Чистый JavaScript (ES5) - без библиотек\\n' +
-'// ==========================================================================\\n' +
-'function ResilientBatchSigner(docs, thumbprint, maxTimeoutSec) {\\n' +
-'    var STORAGE_KEY = "CP_BATCH_STATE";\\n' +
-'    var TIMEOUT_SEC = maxTimeoutSec || 30; // таймаут на 1 документ (PIN-код)\\n' +
-'    var currentIndex = 0;\\n' +
-'    var currentStartTime = 0;\\n' +
-'    var currentOpId = 1;\\n' +
-'    var isRunning = false;\\n\\n' +
-'    // 1. Восстановление с контрольной точки\\n' +
-'    var saved = localStorage.getItem(STORAGE_KEY);\\n' +
-'    if (saved) {\\n' +
-'        currentIndex = JSON.parse(saved).currentIndex || 0;\\n' +
-'    }\\n\\n' +
-'    // 2. СТОРОЖЕВОЙ ИНТЕРВАЛЬНЫЙ ТАЙМЕР ПРОВЕРКИ ЗАВИСАНИЙ\\n' +
-'    setInterval(function checkHang() {\\n' +
-'        if (!isRunning || currentIndex >= docs.length) return;\\n' +
-'        var elapsed = (new Date().getTime() - currentStartTime) / 1000;\\n' +
-'        if (elapsed > TIMEOUT_SEC) {\\n' +
-'            console.warn("ВНИМАНИЕ: Процесс подписания документа #" + (currentIndex + 1) + " подвис!");\\n' +
-'            currentOpId++; // Аннулируем старый дескриптор/коллбек\\n' +
-'            if (window.CollectGarbage) window.CollectGarbage(); // Очистка COM\\n' +
-'            console.log("Автоматический перезапуск подписания...");\\n' +
-'            setTimeout(processNext, 1000); // АВТО-ПЕРЕЗАПУСК\\n' +
-'        }\\n' +
-'    }, 1000);\\n\\n' +
-'    function processNext() {\\n' +
-'        if (currentIndex >= docs.length) {\\n' +
-'            isRunning = false;\\n' +
-'            localStorage.removeItem(STORAGE_KEY);\\n' +
-'            return alert("Все документы успешно подписаны!");\\n' +
-'        }\\n\\n' +
-'        isRunning = true;\\n' +
-'        currentStartTime = new Date().getTime();\\n' +
-'        var thisOpId = currentOpId;\\n\\n' +
-'        signDoc(docs[currentIndex], thumbprint, function(err, sig) {\\n' +
-'            // Если операция уже была перезапущена по таймауту - отбрасываем зомби-ответ\\n' +
-'            if (thisOpId !== currentOpId) return;\\n\\n' +
-'            if (err) {\\n' +
-'                if (err.hex === "0x800706BA") {\\n' +
-'                    return setTimeout(processNext, 2000); // автоповтор при сбое RPC\\n' +
-'                }\\n' +
-'                return alert("Ошибка: " + err.message);\\n' +
-'            }\\n\\n' +
-'            currentIndex++;\\n' +
-'            localStorage.setItem(STORAGE_KEY, JSON.stringify({ currentIndex: currentIndex }));\\n\\n' +
-'            // Очистка памяти COM каждые 5 документов\\n' +
-'            if (currentIndex % 5 === 0 && window.CollectGarbage) {\\n' +
-'                window.CollectGarbage();\\n' +
-'            }\\n' +
-'            setTimeout(processNext, 50);\\n' +
-'        });\\n' +
-'    }\\n\\n' +
-'    return { start: processNext };\\n' +
-'}\\n\\n' +
-'function signDoc(doc, thumbprint, cb) {\\n' +
-'    var oSigner = null, oSignedData = null, oStore = null;\\n' +
-'    try {\\n' +
-'        oStore = new ActiveXObject("CAdESCOM.Store");\\n' +
-'        oStore.Open(2, "My", 2);\\n' +
-'        var certs = oStore.Certificates.Find(0, thumbprint);\\n' +
-'        if (certs.Count === 0) throw new Error("Сертификат не найден в Личных");\\n\\n' +
-'        oSigner = new ActiveXObject("CAdESCOM.CPSigner");\\n' +
-'        oSigner.Certificate = certs.Item(1);\\n\\n' +
-'        oSignedData = new ActiveXObject("CAdESCOM.CadesSignedData");\\n' +
-'        oSignedData.ContentEncoding = 1;\\n' +
-'        oSignedData.Content = doc.base64;\\n\\n' +
-'        var signature = oSignedData.SignCades(oSigner, 1, true);\\n' +
-'        cb(null, signature);\\n' +
-'    } catch(e) {\\n' +
-'        e.hex = "0x" + ((e.number >>> 0).toString(16).toUpperCase());\\n' +
-'        cb(e);\\n' +
-'    } finally {\\n' +
-'        if (oStore) { try { oStore.Close(); } catch(ex){} }\\n' +
-'        oStore = null; oSigner = null; oSignedData = null;\\n' +
-'        if (window.CollectGarbage) window.CollectGarbage();\\n' +
-'    }\\n' +
-'}';
-
+  // Загружаем и отображаем текст модуля resilient-batch-signer.js во вкладке кода
   window.onload = function() {
-    var view = document.getElementById('pureJsCodeView');
-    if (view) view.innerText = pureCodeString.replace(/\\n/g, '\n');
-    checkAutoResumeOnLoad();
+    renderDocsUI();
+    updateProgressUI(signer.currentIndex, signer.documents.length);
+
+    // Загрузка содержимого resilient-batch-signer.js для отображения во вкладке
+    fetch('./resilient-batch-signer.js')
+      .then(function(res) { return res.text(); })
+      .then(function(text) {
+        var pre = document.getElementById('moduleCodeView');
+        if (pre) pre.innerText = text;
+      })
+      .catch(function() {
+        var pre = document.getElementById('moduleCodeView');
+        if (pre) pre.innerText = '// Модуль доступен в файле ./resilient-batch-signer.js';
+      });
   };
 })();
 </script>
