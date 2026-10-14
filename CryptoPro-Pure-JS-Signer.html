@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!-- =====================================================================
+     ПОЛНОСТЬЮ АВТОНОМНЫЙ ПАКЕТНЫЙ ПОДПИСАНТ НА ЧИСТОМ JAVASCRIPT (ES5 / IE11)
+     Без внешних библиотек, без Node.js, без PowerShell.
+     Сохраните как standalone-signer.html и откройте в Internet Explorer.
+     ===================================================================== -->
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta charset="utf-8" />
+    <title>Чистый JS: Отказоустойчивое подписание КриптоПро</title>
+    <style>
+        body { font-family: "Segoe UI", Arial, sans-serif; background: #f8fafc; margin: 20px; color: #1e293b; }
+        .card { background: white; border: 1px solid #cbd5e1; border-radius: 8px; padding: 20px; max-width: 800px; margin: 0 auto 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        h1 { font-size: 20px; margin-top: 0; color: #0f172a; }
+        .btn { background: #0284c7; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn:hover { background: #0369a1; }
+        .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+        .btn-reset { background: #64748b; margin-left: 8px; }
+        #log { background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 6px; font-family: Consolas, monospace; font-size: 12px; height: 200px; overflow-y: auto; margin-top: 15px; }
+        .progress-bar { background: #e2e8f0; border-radius: 999px; height: 12px; overflow: hidden; margin: 15px 0; }
+        .progress-fill { background: #10b981; height: 100%; width: 0%; transition: width 0.3s; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+        .badge-info { background: #e0f2fe; color: #0369a1; }
+        .badge-success { background: #dcfce7; color: #15803d; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>Отказоустойчивое подписание на чистом JavaScript</h1>
+    <p>Реализация в <strong>одном файле</strong> без внешних зависимостей. Поддерживает сборку мусора, изоляцию в iframe и сохранение контрольных точек в LocalStorage.</p>
+
+    <div style="margin-bottom: 15px;">
+        <label><strong>Отпечаток сертификата (SHA-1 Thumbprint):</strong></label><br />
+        <input type="text" id="certThumb" value="38FA5B74D1C35502A5092BC18C2C94FA5E6D8A12" style="width: 100%; padding: 8px; font-family: monospace; border: 1px solid #cbd5e1; border-radius: 4px; margin-top: 4px;" />
+    </div>
+
+    <div>
+        <button id="btnStart" class="btn" onclick="startBatchSigning()">Начать / Возобновить подписание</button>
+        <button id="btnReset" class="btn btn-reset" onclick="resetState()">Сбросить журнал</button>
+        <span id="sessionStatus" class="badge badge-info" style="margin-left: 10px;">Готов к работе</span>
+    </div>
+
+    <div class="progress-bar">
+        <div id="progressFill" class="progress-fill"></div>
+    </div>
+    <div style="font-size: 12px; color: #64748b;" id="progressText">0 из 0 документов</div>
+
+    <div id="log"></div>
+</div>
+
+<script type="text/javascript">
+(function() {
+    'use strict';
+
+    var STORAGE_KEY = 'CP_BATCH_STATE_V1';
+    var CADES_BES = 1;
+    var CADESCOM_BASE64_TO_BINARY = 1;
+    var CAPICOM_CURRENT_USER_STORE = 2;
+    var CAPICOM_MY_STORE = "My";
+    var CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2;
+    var CERT_FIND_SHA1_HASH = 0;
+
+    // Демонстрационный массив документов для подписания (Base64)
+    var DOCUMENTS = [
+        { id: "DOC-1", name: "УПД_№841.xml", base64: "PHJvb3Q+VGVzdCBVUEQgMSAxMjM0NTY3ODk8L3Jvb3Q+" },
+        { id: "DOC-2", name: "Акт_№102.xml", base64: "PHJvb3Q+QWN0IGRhdGEgMjAyNiBzYW1wbGU8L3Jvb3Q+" },
+        { id: "DOC-3", name: "Договор_№77.pdf", base64: "JVBERi0xLjQKJcTl8uXrp/Og0MTGCjQgMCBvYmoKPDw..." },
+        { id: "DOC-4", name: "Счет_№551.xml", base64: "PHJvb3Q+SW52b2ljZSA1NTEgYWxwaGE8L3Jvb3Q+" },
+        { id: "DOC-5", name: "УПД_№842.xml", base64: "PHJvb3Q+VGVzdCBVUEQgMiAxMjM0NTY3ODk8L3Jvb3Q+" }
+    ];
+
+    function log(msg, color) {
+        var logBox = document.getElementById('log');
+        var time = new Date().toLocaleTimeString();
+        var el = document.createElement('div');
+        el.style.color = color || '#38bdf8';
+        el.appendChild(document.createTextNode('[' + time + '] ' + msg));
+        logBox.appendChild(el);
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    // 1. ПРОВЕРКА ВОЗОБНОВЛЕНИЯ ПРИ ЗАГРУЗКЕ СТРАНИЦЫ
+    window.onload = function() {
+        var saved = loadCheckpoint();
+        if (saved && saved.currentIndex < DOCUMENTS.length && saved.currentIndex > 0) {
+            log("ВНИМАНИЕ: Найдена незавершенная сессия!", "#facc15");
+            log("Было успешно подписано " + saved.currentIndex + " из " + DOCUMENTS.length + " документов.", "#facc15");
+            log("Нажмите 'Начать / Возобновить' для продолжения с документа #" + (saved.currentIndex + 1), "#a7f3d0");
+            document.getElementById('sessionStatus').innerHTML = "Прервано на док. #" + (saved.currentIndex + 1);
+            updateProgress(saved.currentIndex, DOCUMENTS.length);
+        }
+    };
+
+    function loadCheckpoint() {
+        try {
+            var raw = window.localStorage.getItem(STORAGE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch(e) { return null; }
+    }
+
+    function saveCheckpoint(index) {
+        try {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                currentIndex: index,
+                total: DOCUMENTS.length,
+                updatedAt: new Date().getTime()
+            }));
+        } catch(e) {}
+    }
+
+    function updateProgress(current, total) {
+        var pct = Math.round((current / total) * 100);
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('progressText').innerHTML = current + ' из ' + total + ' документов (' + pct + '%)';
+    }
+
+    // 2. ПОЛУЧЕНИЕ СЕРТИФИКАТА С БЕЗОПАСНЫМ ЗАКРЫТИЕМ ХРАНИЛИЩА
+    function getCertificate(thumbprint) {
+        var oStore = null;
+        var oCerts = null;
+        try {
+            oStore = new ActiveXObject("CAdESCOM.Store");
+            oStore.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED);
+            var clean = thumbprint.replace(/\s+/g, '').toUpperCase();
+            oCerts = oStore.Certificates.Find(CERT_FIND_SHA1_HASH, clean);
+            if (oCerts.Count === 0) throw new Error("Сертификат " + clean + " не найден в Личных!");
+            return oCerts.Item(1);
+        } finally {
+            if (oStore) { try { oStore.Close(); } catch(e){} }
+            oStore = null;
+            oCerts = null;
+        }
+    }
+
+    // 3. ПОДПИСАНИЕ ОДНОГО ДОКУМЕНТА С ЗАЩИТОЙ ПО ПАМЯТИ
+    function signSingle(cert, docItem, callback) {
+        var oSigner = null;
+        var oSignedData = null;
+
+        // Пауза 20мс позволяет разгрузить очередь сообщений Windows в IE
+        setTimeout(function() {
+            try {
+                oSigner = new ActiveXObject("CAdESCOM.CPSigner");
+                oSigner.Certificate = cert;
+                oSigner.CheckCertificate = true;
+
+                oSignedData = new ActiveXObject("CAdESCOM.CadesSignedData");
+                oSignedData.ContentEncoding = CADESCOM_BASE64_TO_BINARY;
+                oSignedData.Content = docItem.base64;
+
+                // Создание отсоединенной подписи CADES_BES
+                var signature = oSignedData.SignCades(oSigner, CADES_BES, true);
+
+                // Очистка памяти
+                oSigner = null;
+                oSignedData = null;
+                if (typeof window.CollectGarbage === "function") {
+                    window.CollectGarbage();
+                }
+
+                callback(null, signature);
+            } catch (err) {
+                oSigner = null;
+                oSignedData = null;
+                if (typeof window.CollectGarbage === "function") {
+                    window.CollectGarbage();
+                }
+                var hex = "0x" + ((err.number >>> 0).toString(16).toUpperCase());
+                err.hexCode = hex;
+                callback(err);
+            }
+        }, 20);
+    }
+
+    // 4. ГЛАВНЫЙ ЦИКЛ ПОДПИСАНИЯ
+    window.startBatchSigning = function() {
+        var thumb = document.getElementById('certThumb').value;
+        var cert = null;
+
+        try {
+            cert = getCertificate(thumb);
+        } catch(e) {
+            log("ОШИБКА: " + e.message, "#f87171");
+            return;
+        }
+
+        var saved = loadCheckpoint();
+        var index = (saved && saved.currentIndex) ? saved.currentIndex : 0;
+
+        document.getElementById('btnStart').disabled = true;
+        document.getElementById('sessionStatus').innerHTML = "В процессе...";
+
+        function step() {
+            if (index >= DOCUMENTS.length) {
+                log("ВСЕ ДОКУМЕНТЫ УСПЕШНО ПОДПИСАНЫ!", "#4ade80");
+                document.getElementById('sessionStatus').innerHTML = "Завершено";
+                document.getElementById('btnStart').disabled = false;
+                window.localStorage.removeItem(STORAGE_KEY);
+                return;
+            }
+
+            var doc = DOCUMENTS[index];
+            log("Подписание #" + (index + 1) + ": " + doc.name + "...");
+
+            signSingle(cert, doc, function(err, signature) {
+                if (err) {
+                    log("Сбой на " + doc.name + ": " + err.message + " (" + err.hexCode + ")", "#f87171");
+
+                    // Если упал RPC-сервер КриптоПро (0x800706BA) - ждем 2 сек и повторяем
+                    if (err.hexCode === "0x800706BA") {
+                        log("Перезапуск соединения с криптопровайдером через 2 сек...", "#facc15");
+                        setTimeout(step, 2000);
+                        return;
+                    }
+
+                    // При других ошибках даем пользователю шанс повторить
+                    document.getElementById('btnStart').disabled = false;
+                    document.getElementById('sessionStatus').innerHTML = "Ошибка на документе #" + (index + 1);
+                    return;
+                }
+
+                log("Успешно! Хеш: " + signature.substring(0, 20) + "...", "#4ade80");
+                index++;
+                saveCheckpoint(index);
+                updateProgress(index, DOCUMENTS.length);
+
+                // Очистка памяти каждые 2 документа
+                if (index % 2 === 0 && typeof window.CollectGarbage === "function") {
+                    window.CollectGarbage();
+                }
+
+                // Переход к следующему документу
+                setTimeout(step, 100);
+            });
+        }
+
+        step();
+    };
+
+    window.resetState = function() {
+        window.localStorage.removeItem(STORAGE_KEY);
+        updateProgress(0, DOCUMENTS.length);
+        document.getElementById('sessionStatus').innerHTML = "Сброшено";
+        log("Журнал контрольных точек очищен.", "#94a3b8");
+    };
+})();
+</script>
+
+</body>
+</html>

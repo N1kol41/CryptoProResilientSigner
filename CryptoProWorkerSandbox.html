@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!-- CryptoProWorkerSandbox.html - Скрытый воркер для вызова ActiveX в IE -->
+<html>
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>CryptoPro Worker</title>
+</head>
+<body>
+<script type="text/javascript">
+(function() {
+    'use strict';
+
+    // Слушатель сообщений от родительского окна (Parent Host)
+    window.attachEvent ? window.attachEvent('onmessage', handleMessage) : window.addEventListener('message', handleMessage, false);
+
+    function handleMessage(event) {
+        if (!event.data || !event.data.action) return;
+
+        if (event.data.action === 'PING') {
+            // Heartbeat ответ родителю: воркер жив
+            event.source.postMessage({ action: 'PONG', time: new Date().getTime() }, '*');
+            return;
+        }
+
+        if (event.data.action === 'SIGN_DOC') {
+            executeSign(event.data.payload, event.source);
+        }
+    }
+
+    function executeSign(payload, parentWindow) {
+        var oSigner = null;
+        var oSignedData = null;
+        var oStore = null;
+
+        try {
+            oStore = new ActiveXObject("CAdESCOM.Store");
+            oStore.Open(2, "My", 2);
+            var oCerts = oStore.Certificates.Find(0, payload.thumbprint.replace(/\s+/g, ''));
+            if (oCerts.Count === 0) throw new Error("Сертификат не найден в хранилище MY");
+
+            var cert = oCerts.Item(1);
+
+            oSigner = new ActiveXObject("CAdESCOM.CPSigner");
+            oSigner.Certificate = cert;
+
+            oSignedData = new ActiveXObject("CAdESCOM.CadesSignedData");
+            oSignedData.ContentEncoding = 1; // CADESCOM_BASE64_TO_BINARY
+            oSignedData.Content = payload.base64Content;
+
+            var signature = oSignedData.SignCades(oSigner, 1, true); // CADES_BES, detached
+
+            parentWindow.postMessage({
+                action: 'SIGN_SUCCESS',
+                docId: payload.docId,
+                signature: signature
+            }, '*');
+
+        } catch (e) {
+            var hexCode = "0x" + ((e.number >>> 0).toString(16).toUpperCase());
+            parentWindow.postMessage({
+                action: 'SIGN_ERROR',
+                docId: payload.docId,
+                errorMessage: e.message,
+                hexCode: hexCode
+            }, '*');
+        } finally {
+            if (oStore) { try { oStore.Close(); } catch(ex) {} }
+            oStore = null;
+            oSigner = null;
+            oSignedData = null;
+            if (typeof window.CollectGarbage === "function") {
+                window.CollectGarbage();
+            }
+        }
+    }
+
+    // Сообщаем родительскому окну о готовности
+    if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ action: 'WORKER_READY' }, '*');
+    }
+})();
+</script>
+</body>
+</html>
